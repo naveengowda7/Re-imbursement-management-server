@@ -71,7 +71,7 @@ model User {
   id String @id @default(uuid())
   companyId String
   name String
-  email String
+  email String @unique
   passwordHash String
   role Role
   managerId String?
@@ -80,8 +80,10 @@ model User {
   createdAt DateTime @default(now())
 
   company Company @relation(fields:[companyId], references:[id])
-  manager User? @relation("UserManager",fields:[managerId],references:[id])
-  subordinates: User[] @relation("UserManager")
+
+  manager User? @relation("UserManager", fields:[managerId], references:[id])
+  subordinates User[] @relation("UserManager")
+
   specificApproverPolicies ApprovalPolicy[] @relation("SpecificApprover")
   stepApprovals ApprovalPolicyStepApprover[]
   expenses Expense[]
@@ -90,7 +92,6 @@ model User {
   notifications Notification[]
   auditLogs AuditLog[]
   refreshTokens RefreshToken[]
-
 }
 
 model Category {
@@ -112,22 +113,25 @@ model ApprovalPolicy {
   maxAmount Float?
   conditionalRule ConditionalRule
   thresholdPercentage Int?
+  specificApproverId String?
   isActive Boolean @default(true)
   createdAt DateTime @default(now())
 
   company Company @relation(fields:[companyId], references:[id])
-  specificApprover User? @relation("SpecificApprover",fields:[specificApproverId],references:[id])
+  specificApprover User? @relation("SpecificApprover", fields:[specificApproverId], references:[id])
+
   steps ApprovalPolicyStep[]
   expenses Expense[]
 }
 
-model ApprovalPolicyStep{
+model ApprovalPolicyStep {
   id String @id @default(uuid())
   policyId String
   stepNumber Int
   isManagerStep Boolean @default(false)
   createdAt DateTime @default(now())
-  policy approvalPolicy @relation(fields:[policyId], references:[id])
+
+  policy ApprovalPolicy @relation(fields:[policyId], references:[id])
   approvers ApprovalPolicyStepApprover[]
 }
 
@@ -159,8 +163,8 @@ model Expense {
   policyId String?
   revisionNumber Int @default(0)
   parentExpenseId String?
-  SubmittedAt DateTime?
-  reolvedAt DateTime?
+  submittedAt DateTime?
+  resolvedAt DateTime?
   createdAt DateTime @default(now())
 
   company Company @relation(fields:[companyId], references:[id])
@@ -173,7 +177,7 @@ model Expense {
   logs ExpenseApprovalLog[]
   comments ExpenseComment[]
   policySnapshot ExpensePolicySnapshot?
-  ocrReceipt ocrReceipt?
+  ocrReceipt OcrReceipt?
   notifications Notification[]
 }
 
@@ -219,7 +223,7 @@ model ExpensePolicySnapshot {
 model Notification {
   id String @id @default(uuid())
   companyId String
-  receiptId String
+  recipientId String
   type NotificationType
   title String
   body String
@@ -229,7 +233,7 @@ model Notification {
   createdAt DateTime @default(now())
 
   company Company @relation(fields:[companyId],references:[id])
-  recipient User @relation(fields:[receiptId], references:[id])
+  recipient User @relation(fields:[recipientId], references:[id])
   expense Expense? @relation(fields:[referenceId],references:[id])
 }
 
@@ -255,11 +259,11 @@ model OcrReceipt {
 model AuditLog {
   id String @id @default(uuid())
   companyId String
-  actionId String
+  actorId String
   action String
   entityType String
   entityId String
-  record beforeState Json?
+  beforeState Json?
   afterState Json?
   createdAt DateTime @default(now())
 

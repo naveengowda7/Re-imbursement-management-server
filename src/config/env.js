@@ -11,13 +11,11 @@ function optionalEnv(key, fallback) {
 }
 
 export const env = {
-  PORT:      optionalEnv('PORT', '4000'),
+  PORT: optionalEnv('PORT', '4000'),
 
-  DATABASE_URL: requireEnv('Sachi_DATABASE_URL'),
-
-  JWT_SECRET:         requireEnv('JWT_SECRET'),
+  JWT_SECRET: requireEnv('JWT_SECRET'),
   JWT_REFRESH_SECRET: requireEnv('JWT_REFRESH_SECRET'),
-  JWT_EXPIRES_IN:     optionalEnv('JWT_EXPIRES_IN', '15m'),
+  JWT_EXPIRES_IN: optionalEnv('JWT_EXPIRES_IN', '15m'),
   JWT_REFRESH_EXPIRES_IN: optionalEnv('JWT_REFRESH_EXPIRES_IN', '7d'),
 
   COOKIE_SECRET: requireEnv('COOKIE_SECRET'),
@@ -32,6 +30,7 @@ export const env = {
     'COUNTRIES_API_BASE',
     'https://restcountries.com/v3.1'
   ),
+  DATABASE_URL: requireEnv('DATABASE_URL')
 
-  
+
 } 
