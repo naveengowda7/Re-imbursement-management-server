@@ -1,0 +1,285 @@
+generator client{
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum ExpenseStatus {
+  DRAFT
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  REVISED
+}
+
+enum ApprovalAction {
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
+enum NotificationType{
+  EXPENSE_SUBMITTED
+  APPROVAL_REQUESTED
+  EXPENSE_APPROVED
+  EXPENSE_REJECTED
+  EXPENSE_REVISED
+  STEP_COMPLETED
+  ADMIN_OVERRIDE
+}
+
+enum ConditionalRule {
+  PERCENTAGE
+  SPECIFIC
+  HYBRID
+  NONE
+}
+
+enum OCRStatus{
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Company {
+  id String @id @default(uuid())
+  name String
+  country String
+  currencyCode String
+  currencySymbol String
+  createdAt DateTime @default(now())
+
+  users User[]
+  categories Category[]
+  approvalPolicies ApprovalPolicy[]
+  expenses Expense[]
+  notifications Notification[]
+  auditLogs AuditLog[]
+}
+
+model User {
+  id String @id @default(uuid())
+  companyId String
+  name String
+  email String
+  passwordHash String
+  role Role
+  managerId String?
+  isActive Boolean @default(true)
+  lastLoginAt DateTime?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields:[companyId], references:[id])
+  manager User? @relation("UserManager",fields:[managerId],references:[id])
+  subordinates: User[] @relation("UserManager")
+  specificApproverPolicies ApprovalPolicy[] @relation("SpecificApprover")
+  stepApprovals ApprovalPolicyStepApprover[]
+  expenses Expense[]
+  expenseLogs ExpenseApprovalLog[]
+  comments ExpenseComment[]
+  notifications Notification[]
+  auditLogs AuditLog[]
+  refreshTokens RefreshToken[]
+
+}
+
+model Category {
+  id String @id @default(uuid())
+  companyId String
+  name String
+  isManagerApprover Boolean
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  company Company @relation(fields:[companyId],references:[id])
+  expenses Expense[]
+}
+
+model ApprovalPolicy {
+  id String @id @default(uuid())
+  companyId String
+  name String
+  minAmount Float
+  maxAmount Float?
+  conditionalRule ConditionalRule
+  thresholdPercentage Int?
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields:[companyId], references:[id])
+  specificApprover User? @relation("SpecificApprover",fields:[specificApproverId],references:[id])
+  steps ApprovalPolicyStep[]
+  expenses Expense[]
+}
+
+model ApprovalPolicyStep{
+  id String @id @default(uuid())
+  policyId String
+  stepNumber Int
+  isManagerStep Boolean @default(false)
+  createdAt DateTime @default(now())
+  policy approvalPolicy @relation(fields:[policyId], references:[id])
+  approvers ApprovalPolicyStepApprover[]
+}
+
+model ApprovalPolicyStepApprover {
+  id String @id @default(uuid())
+  stepId String
+  approverId String
+  displayOrder Int?
+  step ApprovalPolicyStep @relation(fields:[stepId], references:[id])
+  approver User @relation(fields:[approverId],references:[id])
+}
+
+model Expense {
+  id String @id @default(uuid())
+  companyId String
+  employeeId String
+  categoryId String
+  title String?
+  amount Float 
+  currencyCode String
+  amountCompanyCurrency Float
+  exchangeRateSnapshot Float
+  description String?
+  expenseDate DateTime
+  receiptUrl String?
+
+  status ExpenseStatus @default(DRAFT)
+  currentStep Int @default(0)
+  policyId String?
+  revisionNumber Int @default(0)
+  parentExpenseId String?
+  SubmittedAt DateTime?
+  reolvedAt DateTime?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields:[companyId], references:[id])
+  employee User @relation(fields:[employeeId],references:[id])
+  category Category @relation(fields:[categoryId],references:[id])
+  policy ApprovalPolicy? @relation(fields:[policyId], references:[id])
+  parentExpense Expense? @relation("ExpenseRevision",fields:[parentExpenseId],references:[id])
+  revisions Expense[] @relation("ExpenseRevision")
+  
+  logs ExpenseApprovalLog[]
+  comments ExpenseComment[]
+  policySnapshot ExpensePolicySnapshot?
+  ocrReceipt ocrReceipt?
+  notifications Notification[]
+}
+
+model ExpenseApprovalLog {
+  id String @id @default(uuid())
+  expenseId String
+  stepNumber Int
+  approverId String
+  action ApprovalAction
+  comment String?
+  isSuperseded Boolean @default(false)
+  actionedAt DateTime @default(now())
+
+  expense Expense @relation(fields:[expenseId],references:[id])
+  approver User @relation(fields:[approverId],references:[id])
+}
+
+model ExpenseComment {
+  id String @id @default(uuid())
+  expenseId String
+  authorId String
+  comment String
+  createdAt DateTime @default(now())
+
+  expense Expense @relation(fields:[expenseId],references:[id])
+  author User @relation(fields:[authorId],references:[id])
+}
+
+model ExpensePolicySnapshot {
+  id String @id @default(uuid())
+  expenseId String @unique
+  policyNumber String
+  minAmount Float
+  maxAmount Float?
+  conditionalRule ConditionalRule
+  thresholdPercentage Int?
+  stepsSnapshot Json
+  createdAt DateTime @default(now())
+  
+  expense Expense @relation(fields:[expenseId],references:[id])
+}
+
+model Notification {
+  id String @id @default(uuid())
+  companyId String
+  receiptId String
+  type NotificationType
+  title String
+  body String
+  referenceId String?
+  referenceType String?
+  isRead Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields:[companyId],references:[id])
+  recipient User @relation(fields:[receiptId], references:[id])
+  expense Expense? @relation(fields:[referenceId],references:[id])
+}
+
+model OcrReceipt {  
+  id String @id @default(uuid())
+  expenseId String @unique
+  ocrRawResponse Json
+  parsedAmount Float?
+  parsedCurrency String?
+  parsedDate DateTime?
+  parsedMerchant String?
+  parsedDescription String?
+  parsedCategory String?
+  confidenceScore Float?
+  status OCRStatus @default(PROCESSING)
+  processedAt DateTime?
+  createdAt DateTime @default(now())
+
+  expense Expense @relation(fields:[expenseId], references:[id])
+
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+  companyId String
+  actionId String
+  action String
+  entityType String
+  entityId String
+  record beforeState Json?
+  afterState Json?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields:[companyId], references:[id])
+  actor User @relation(fields:[actorId], references:[id])
+}
+
+model RefreshToken {
+  id   String   @id @default(uuid())
+  userId   String
+  tokenHash   String   @unique  
+  expiresAt   DateTime          
+  isRevoked   Boolean  @default(false)
+  ipAddress   String?           
+  userAgent   String?           
+  createdAt   DateTime @default(now())
+  revokedAt   DateTime?         
+
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@index([userId])             
+  @@index([tokenHash])          
+}
