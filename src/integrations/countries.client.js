@@ -37,7 +37,7 @@ async function populateCache() {
 }
 
 
-/**
+/*
  Returns currency info for a given country name
  { currencyCode: 'INR', currencySymbol: '₹', currencyName: 'Indian rupee' }
  */
